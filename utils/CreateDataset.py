@@ -1,6 +1,5 @@
 import os
 import string
-
 import numpy as np
 from sklearn.model_selection import train_test_split
 import cv2
@@ -35,7 +34,7 @@ def create_dataset(img_folder): #Creates a dataset
     im = [] #List of image values
     class_name = []#Corresponding one hot class
 
-
+    TARGET_SHAPE = (244,244)
     for sub_folder in listdir_nohidden(img_folder): #Gets each folder within data folder
         for file in listdir_nohidden(os.path.join(img_folder,sub_folder)): #Gets 'file' i.e. individual image in folder
 
@@ -43,6 +42,8 @@ def create_dataset(img_folder): #Creates a dataset
             # image = np.array(image) #turn image into an array
             # image = image.astype('float32') #sets datatype of array
             # image /= 255 #normalise
+            image = cv2.resize(image, TARGET_SHAPE)
+            image = image.astype('float32') / 255.0
             im.append(image)
             class_name.append(d[sub_folder])
 

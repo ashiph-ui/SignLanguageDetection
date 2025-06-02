@@ -1,6 +1,7 @@
 import mediapipe as mp
 import cv2
 import numpy as np
+
 # Initialize MediaPipe Hands
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
@@ -46,8 +47,10 @@ def augment_data(image, label):
 
 def get_coords(image):
     # Preprocess the image
-    image = cv2.flip(image, 1)
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    # image is float32 [0.0 - 1.0]; convert it back
+    image_uint8 = (image * 255).astype(np.uint8)
+    image_rgb = cv2.cvtColor(image_uint8, cv2.COLOR_BGR2RGB)
     image_rgb = cv2.resize(image_rgb, (224, 224))
     
     # Process the image
