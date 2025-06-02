@@ -2,69 +2,66 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 
-// Define video constraints for the webcam feed
+// Webcam video settings (224x224, front-facing camera)
 const videoConstraints = {
   width: 224,
   height: 224,
-  facingMode: 'user', // Use the front-facing camera
+  facingMode: 'user',
 };
 
 function CameraComponent() {
-  // Create a reference to the Webcam component
+  // Reference to the webcam component
   const webcamRef = useRef(null);
 
-  // State to store the prediction result from the backend
+  // Store the predicted label returned from the backend
   const [prediction, setPrediction] = useState('');
 
-  // useEffect will run once when the component mounts
-  // Sets up an interval to capture an image every 3 seconds and get a prediction
+  // useEffect: runs once on mount, sets up frame capture every 3 seconds
   useEffect(() => {
     const interval = setInterval(async () => {
-      // Make sure the webcam is ready and can capture an image
+      // Ensure the webcam is available
       if (webcamRef.current) {
-        // Capture the current frame from the webcam
+        // Capture a frame from the webcam
         const imageSrc = webcamRef.current.getScreenshot();
 
-        // If a valid image was captured, send it to the backend
         if (imageSrc) {
           try {
-            const res = await fetch('http://localhost:8000/predict', {
+            // TODO: Replace with your actual backend URL when known
+            const response = await fetch('http://localhost:8000/predict', {
               method: 'POST',
-              body: JSON.stringify({ image: imageSrc }),
               headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: imageSrc }),
             });
 
-            // Parse the prediction response from the backend
-            const result = await res.json();
-
-            // Update the prediction state
+            // Parse and store the prediction from backend
+            const result = await response.json();
             setPrediction(result.label);
-          } catch (error) {
-            console.error('Prediction fetch error:', error);
+          } catch (err) {
+            console.error('Error sending image to backend:', err);
           }
         }
       }
-    }, 3000); // Capture an image every 3 seconds
+    }, 3000); // Capture a frame every 3 seconds
 
-    // Clear the interval when the component unmounts
+    // Clean up the interval on unmount
     return () => clearInterval(interval);
   }, []);
 
-  // Return the webcam view and the current prediction result
+  // Render the webcam and the current prediction
   return (
     <div className="camera-container">
       <Webcam
         audio={false}
-        height={224}
         ref={webcamRef}
-        screenshotFormat="image/jpeg"
+        height={224}
         width={224}
+        screenshotFormat="image/jpeg"
         videoConstraints={videoConstraints}
       />
-      {/* Display the latest prediction */}
       <p>Prediction: {prediction}</p>
     </div>
   );
 }
 
 export default CameraComponent;
+
