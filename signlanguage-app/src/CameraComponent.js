@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 
+// Webcam settings
 const videoConstraints = {
   width: 224,
   height: 224,
@@ -8,38 +9,41 @@ const videoConstraints = {
 };
 
 function CameraComponent() {
-  const webcamRef = useRef(null);
-  const [prediction, setPrediction] = useState('');
+  const webcamRef = useRef(null); // Webcam reference
+  const [prediction, setPrediction] = useState(''); // Prediction state
 
   useEffect(() => {
     const interval = setInterval(async () => {
       if (webcamRef.current) {
+        // Capture the current frame as a base64 image
         const imageSrc = webcamRef.current.getScreenshot();
 
         if (imageSrc) {
-          // Convert base64 to blob
-          const blob = await fetch(imageSrc).then(res => res.blob());
-
-          // Create FormData with the image blob as a file
-          const formData = new FormData();
-          formData.append('file', blob, 'capture.jpg');
-
           try {
+            // Convert base64 to Blob
+            const blob = await fetch(imageSrc).then(res => res.blob());
+
+            // Prepare the form data with the image file
+            const formData = new FormData();
+            formData.append('file', blob, 'capture.jpg');
+
+            // Send the image to the backend
             const response = await fetch('http://localhost:8000/predict/', {
               method: 'POST',
               body: formData,
             });
 
+            // Parse the backend response
             const result = await response.json();
-            setPrediction(result.prediction); // match key with backend response
+            setPrediction(result.prediction); // Update prediction in UI
           } catch (err) {
             console.error('Error sending image to backend:', err);
           }
         }
       }
-    }, 3000);
+    }, 3000); // Capture and send every 3 seconds
 
-    return () => clearInterval(interval);
+    return () => clearInterval(interval); // Clean up the interval on unmount
   }, []);
 
   return (
