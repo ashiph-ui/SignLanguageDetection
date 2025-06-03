@@ -9,6 +9,9 @@ COPY requirements.txt .
 # Upgrade pip and install python dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
+RUN apt-get update && apt-get install -y libgl1
+RUN apt-get update && apt-get install -y libglib2.0-0
+
 
 EXPOSE 8000
 
