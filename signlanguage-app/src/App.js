@@ -12,8 +12,8 @@ function App() {
 
       <nav className="links card">
         <ul>
-          <li><a href="#">GitHub</a></li>
-          <li><a href="#">LinkedIn</a></li>
+          <li><a href="https://github.com/ashiph-ui">GitHub</a></li>
+          <li><a href="www.linkedin.com/in/ashiph-rai-75609b217">LinkedIn</a></li>
           <li><a href="#">Other Projects</a></li>
           <li><a href="#">Contact me</a></li>
         </ul>
