@@ -1,8 +1,6 @@
-// Import necessary React hooks and the react-webcam component
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 
-// Webcam video settings (224x224, front-facing camera)
 const videoConstraints = {
   width: 224,
   height: 224,
@@ -10,44 +8,40 @@ const videoConstraints = {
 };
 
 function CameraComponent() {
-  // Reference to the webcam component
   const webcamRef = useRef(null);
-
-  // Store the predicted label returned from the backend
   const [prediction, setPrediction] = useState('');
 
-  // useEffect: runs once on mount, sets up frame capture every 3 seconds
   useEffect(() => {
     const interval = setInterval(async () => {
-      // Ensure the webcam is available
       if (webcamRef.current) {
-        // Capture a frame from the webcam
         const imageSrc = webcamRef.current.getScreenshot();
 
         if (imageSrc) {
+          // Convert base64 to blob
+          const blob = await fetch(imageSrc).then(res => res.blob());
+
+          // Create FormData with the image blob as a file
+          const formData = new FormData();
+          formData.append('file', blob, 'capture.jpg');
+
           try {
-            // TODO: Replace with your actual backend URL when known
-            const response = await fetch('http://localhost:8000/predict', {
+            const response = await fetch('http://localhost:8000/predict/', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ image: imageSrc }),
+              body: formData,
             });
 
-            // Parse and store the prediction from backend
             const result = await response.json();
-            setPrediction(result.label);
+            setPrediction(result.prediction); // match key with backend response
           } catch (err) {
             console.error('Error sending image to backend:', err);
           }
         }
       }
-    }, 3000); // Capture a frame every 3 seconds
+    }, 3000);
 
-    // Clean up the interval on unmount
     return () => clearInterval(interval);
   }, []);
 
-  // Render the webcam and the current prediction
   return (
     <div className="camera-container">
       <Webcam
