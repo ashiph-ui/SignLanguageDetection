@@ -9,6 +9,14 @@ const videoConstraints = {
   facingMode: 'user',
 };
 
+// Minimum gap between the end of one prediction request and the start of the
+// next. The loop is self-scheduling, so this is a floor, not a fixed cadence.
+const POLL_INTERVAL_MS = 500;
+
+// How many *consecutive* connection-level failures before we declare the
+// backend offline. A single dropped/slow frame then self-heals silently.
+const OFFLINE_THRESHOLD = 3;
+
 function CameraComponent() {
   const webcamRef = useRef(null); // Webcam reference
   const [prediction, setPrediction] = useState(''); // Prediction state
@@ -16,40 +24,78 @@ function CameraComponent() {
   const [backendUp, setBackendUp] = useState(true); // Backend reachability
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      if (webcamRef.current) {
-        // Capture the current frame as a base64 image
-        const imageSrc = webcamRef.current.getScreenshot();
+    let cancelled = false; // Set on unmount to stop the loop
+    let timerId = null; // Pending setTimeout handle for cleanup
+    let failures = 0; // Consecutive connection-level failures
 
-        if (imageSrc) {
-          try {
-            // Convert base64 to Blob
-            const blob = await fetch(imageSrc).then(res => res.blob());
+    // Send a single frame to the backend. Returns nothing; updates state.
+    const sendFrame = async () => {
+      if (!webcamRef.current) return;
 
-            // Prepare the form data with the image file
-            const formData = new FormData();
-            formData.append('file', blob, 'capture.jpg');
+      // Capture the current frame as a base64 image
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (!imageSrc) return;
 
-            // Send the image to the backend
-            const response = await fetch('http://localhost:8000/predict/', {
-              method: 'POST',
-              body: formData,
-            });
+      try {
+        // Convert base64 to Blob
+        const blob = await fetch(imageSrc).then(res => res.blob());
 
-            // Parse the backend response
-            const result = await response.json();
-            setPrediction(result.prediction); // Update prediction in UI
-            setConfidence(result.confidence ?? null);
-            setBackendUp(true);
-          } catch (err) {
-            console.error('Error sending image to backend:', err);
-            setBackendUp(false);
-          }
+        // Prepare the form data with the image file
+        const formData = new FormData();
+        formData.append('file', blob, 'capture.jpg');
+
+        // Send the image to the backend
+        const response = await fetch('http://localhost:8000/predict/', {
+          method: 'POST',
+          body: formData,
+        });
+        if (cancelled) return;
+
+        if (!response.ok) {
+          // The server answered, so it is reachable — this is a per-request
+          // problem (e.g. 500 on an undecodable frame). Reset the offline
+          // counter and keep the last good prediction rather than blanking.
+          failures = 0;
+          setBackendUp(true);
+          return;
+        }
+
+        // Parse the backend response
+        const result = await response.json();
+        if (cancelled) return;
+
+        failures = 0;
+        setPrediction(result.prediction); // Update prediction in UI
+        setConfidence(result.confidence ?? null);
+        setBackendUp(true);
+      } catch (err) {
+        if (cancelled) return;
+        // Connection-level failure (fetch rejected / JSON parse failed).
+        // Only declare the backend offline after several in a row; keep the
+        // last prediction on screen so a single dropped frame is invisible.
+        console.error('Error sending image to backend:', err);
+        failures += 1;
+        if (failures >= OFFLINE_THRESHOLD) {
+          setBackendUp(false);
         }
       }
-    }, 3000); // Capture and send every 3 seconds
+    };
 
-    return () => clearInterval(interval); // Clean up the interval on unmount
+    // Self-scheduling loop: only ever one request in flight, and the next is
+    // scheduled after the previous completes — so a slow frame can never stack.
+    const loop = async () => {
+      await sendFrame();
+      if (!cancelled) {
+        timerId = setTimeout(loop, POLL_INTERVAL_MS);
+      }
+    };
+
+    loop();
+
+    return () => {
+      cancelled = true;
+      if (timerId) clearTimeout(timerId);
+    };
   }, []);
 
   // Decide what to show in the prediction slot

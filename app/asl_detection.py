@@ -40,6 +40,11 @@ scaler = joblib.load("model/scaler.pkl")
 class_map = ['Blank'] + [chr(i) for i in range(ord('A'), ord('Z') + 1)]
 
 mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(static_image_mode=False,
+                        model_complexity=0,
+                        min_detection_confidence=0.2,
+                        min_tracking_confidence=0.5,
+                        max_num_hands=1)
 
 # === Core prediction function ===
 def predict_asl(frame):
@@ -47,26 +52,23 @@ def predict_asl(frame):
 
     Returns a (gesture, confidence) tuple; confidence is None when no hand is found.
     """
-    with mp_hands.Hands(static_image_mode=True,
-                        model_complexity=0,
-                        min_detection_confidence=0.5) as hands:
+   
+    image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    results = hands.process(image_rgb)
 
-        image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = hands.process(image_rgb)
+    if results.multi_hand_world_landmarks:
+        landmarks = results.multi_hand_world_landmarks[0].landmark
+        coords = []
+        for lm in landmarks:
+            coords.extend([lm.x, lm.y, lm.z])
 
-        if results.multi_hand_world_landmarks:
-            landmarks = results.multi_hand_world_landmarks[0].landmark
-            coords = []
-            for lm in landmarks:
-                coords.extend([lm.x, lm.y, lm.z])
+        coords = scaler.transform([coords])
+        input_tensor = torch.tensor(coords, dtype=torch.float32)
+        with torch.no_grad():
+            output = model(input_tensor)
+            probs = F.softmax(output, dim=1)
+            confidence, predicted = torch.max(probs, 1)
+            gesture = class_map[predicted.item()]
+            return gesture, round(confidence.item(), 4)
 
-            coords = scaler.transform([coords])
-            input_tensor = torch.tensor(coords, dtype=torch.float32)
-            with torch.no_grad():
-                output = model(input_tensor)
-                probs = F.softmax(output, dim=1)
-                confidence, predicted = torch.max(probs, 1)
-                gesture = class_map[predicted.item()]
-                return gesture, round(confidence.item(), 4)
-
-        return "No hand detected", None
+    return "No hand detected", None
