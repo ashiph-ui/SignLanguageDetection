@@ -43,7 +43,10 @@ mp_hands = mp.solutions.hands
 
 # === Core prediction function ===
 def predict_asl(frame):
-    """Predict ASL gesture from a single OpenCV frame (BGR image)"""
+    """Predict ASL gesture from a single OpenCV frame (BGR image).
+
+    Returns a (gesture, confidence) tuple; confidence is None when no hand is found.
+    """
     with mp_hands.Hands(static_image_mode=True,
                         model_complexity=0,
                         min_detection_confidence=0.5) as hands:
@@ -56,13 +59,14 @@ def predict_asl(frame):
             coords = []
             for lm in landmarks:
                 coords.extend([lm.x, lm.y, lm.z])
-            
+
             coords = scaler.transform([coords])
             input_tensor = torch.tensor(coords, dtype=torch.float32)
             with torch.no_grad():
                 output = model(input_tensor)
-                _, predicted = torch.max(output, 1)
+                probs = F.softmax(output, dim=1)
+                confidence, predicted = torch.max(probs, 1)
                 gesture = class_map[predicted.item()]
-                return gesture
+                return gesture, round(confidence.item(), 4)
 
-        return "No hand detected"
+        return "No hand detected", None

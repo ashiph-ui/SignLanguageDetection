@@ -26,5 +26,5 @@ async def predict(file: UploadFile = File(...)):
     npimg = np.frombuffer(contents, np.uint8)
     frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
 
-    result = predict_asl(frame)
-    return {"prediction": result}
+    gesture, confidence = predict_asl(frame)
+    return {"prediction": gesture, "confidence": confidence}
